@@ -1,6 +1,7 @@
-# Auction Service – View & Core Logic Analysis
+# Auction View & Core Logic Analysis
+## `auctions/views.py`에 구현
 
-본 문서는 **Django 기반 경매(Auction) 서비스**의  
+프로젝트는 **Django 기반 경매(Auction) 서비스**의  
 `auctions/views.py`를 중심으로 한 **뷰 로직, 서비스 분리, ORM 활용, 성능 최적화**에 대한 분석 및 설계 의도를 설명합니다.
 
 ---
