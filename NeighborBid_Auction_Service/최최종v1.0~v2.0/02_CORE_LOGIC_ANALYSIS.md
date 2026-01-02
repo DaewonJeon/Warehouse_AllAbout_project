@@ -1,4 +1,3 @@
-markdown
 # [Core Logic] 0.1초의 승부, 하이브리드 아키텍처와 동시성 제어
 
 > 이 문서는 A1_NeighborBid_Auction의 심장부인 **'경매 엔진'**의 작동 원리를 파헤칩니다. HTTP와 WebSocket을 병행하는 **하이브리드 아키텍처**와, 수천 건의 입찰 속에서 데이터 정합성을 지켜낸 **동시성 제어(Concurrency Control)** 로직을 상세히 설명합니다.
@@ -38,7 +37,7 @@ class Auction(models.Model):
 | **실시간성** | 페이지 새로고침 필요 | 자동 실시간 업데이트 |
 | **서버 리소스** | 요청 시에만 사용 | 연결 유지로 상시 점유 |
 | **적합한 상품** | 중고 가구, 생활가전 | 한정판 신발, 콘서트 티켓 |
-| **인프라 비용** | 💰 (저렴) | 💰💰💰 (Redis 필요) |
+| **인프라 비용** |  (저렴) |  (Redis 필요) |
 
 ### 1.3 현재 아키텍처 구조도 (개발 환경)
 
@@ -184,7 +183,7 @@ class AuctionConsumer(AsyncWebsocketConsumer):
 시간 T=1: 경매 X에 10,000원 입찰 요청 → 잔액 체크 OK (10,000원 있음)
 시간 T=1: 경매 Y에 10,000원 입찰 요청 → 잔액 체크 OK (아직 10,000원으로 보임!)
 시간 T=2: 경매 X 입찰 성공 → 잔액 = 0원
-시간 T=2: 경매 Y 입찰 성공 → 잔액 = -10,000원 💥
+시간 T=2: 경매 Y 입찰 성공 → 잔액 = -10,000원
 ```
 
 이 문제가 발생하는 이유:
@@ -294,11 +293,11 @@ def place_bid(auction_id, user, amount):
 
 ```python
 # 잘못된 예: 전체 테이블을 Lock (성능 재앙)
-# Auction.objects.select_for_update().all()  # ❌
+# Auction.objects.select_for_update().all()  # 🔺하지말것
 
 # 올바른 예: 필요한 Row만 Lock
-auction = Auction.objects.select_for_update().get(id=auction_id)  # ✅ 해당 경매만
-wallet = Wallet.objects.select_for_update().get(user=user)        # ✅ 해당 지갑만
+auction = Auction.objects.select_for_update().get(id=auction_id)  # 🔹 해당 경매만
+wallet = Wallet.objects.select_for_update().get(user=user)        # 🔹 해당 지갑만
 ```
 
 ---
@@ -323,7 +322,7 @@ with transaction.atomic():
     channel_layer.group_send(...)  # 즉시 전송됨
     
     # 만약 여기서 예외 발생하면?
-    some_validation()  # 💥 Exception!
+    some_validation()  #  Exception!
     # → 트랜잭션 롤백되지만, 알림은 이미 전송됨!
 ```
 
@@ -343,7 +342,7 @@ def buy_now(auction_id, buyer):
                 'type': 'auction_end_notification',
                 'bidder': buyer.username,
                 'amount': instant_price_val,
-                'msg': f"📢 {buyer.username}님이 즉시 구매했습니다!"
+                'msg': f" {buyer.username}님이 즉시 구매했습니다!"
             }
         )
 
@@ -427,7 +426,7 @@ class AuctionConsumer(AsyncWebsocketConsumer):
 
 ## 5. 결론: 설계 철학
 
-A1_NeighborBid의 핵심 로직은 **"화려한 신기술보다는 확실한 제어"**에 초점을 맞추었습니다.
+A1_NeighborBid의 핵심 로직은 **"화려한 신기술보다는 확실한 제어"** 에 초점을 맞추었습니다.
 
 | 원칙 | 적용 방법 |
 |---|---|
@@ -438,5 +437,3 @@ A1_NeighborBid의 핵심 로직은 **"화려한 신기술보다는 확실한 제
 
 > **작성자:** A1_NeighborBid_Auction 백엔드 개발팀  
 > **관련 문서:** [03_SOFTWARE_PATTERNS.md](03_SOFTWARE_PATTERNS.md) | [06_TECHNICAL_DEEP_DIVE.md](06_TECHNICAL_DEEP_DIVE.md)
-
-

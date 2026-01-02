@@ -1,4 +1,3 @@
-````markdown
 # [Backend] Django Channels와 Redis를 활용한 실시간 경매 시스템 심층 분석
 
 > 이 문서는 A1_NeighborBid_Auction 프로젝트의 **기술적 심층 분석**을 다룹니다. Django Channels의 동작 원리, Redis Channel Layer 설정, 그리고 동기-비동기 코드 간의 통합 방법을 상세히 설명합니다.
@@ -60,7 +59,7 @@ CHANNEL_LAYERS = {
 Request → 처리 → Response (연결 종료)
     │
     └─ 요청 1개 = 처리 1회 = 응답 1개
-       연결 유지 불가능 ❌
+       연결 유지 불가능 🔺
 ```
 
 **문제:** WebSocket은 연결을 유지하면서 양방향 통신이 필요한데, WSGI는 이를 지원하지 않음.
@@ -76,7 +75,7 @@ Connection ─────────┼─ WebSocket 연결 유지
                     └─ 백그라운드 태스크
 
     │
-    └─ 하나의 연결에서 다중 메시지 송수신 가능 ✅
+    └─ 하나의 연결에서 다중 메시지 송수신 가능 🔹
 ```
 
 ### 2.3 ASGI 애플리케이션 구조
@@ -237,11 +236,11 @@ websocket_urlpatterns = [
 Django의 ORM은 **동기적**으로 동작하지만, Channels Consumer는 **비동기**입니다.
 
 ```python
-# ❌ 잘못된 방법: 비동기 함수에서 직접 ORM 호출
+# 🔺 잘못된 방법: 비동기 함수에서 직접 ORM 호출
 async def receive(self, text_data):
     auction = Auction.objects.get(id=1)  # SynchronousOnlyOperation 에러!
 
-# ✅ 올바른 방법 1: database_sync_to_async 데코레이터
+# 🔹 올바른 방법 1: database_sync_to_async 데코레이터
 from channels.db import database_sync_to_async
 
 @database_sync_to_async
@@ -251,7 +250,7 @@ def get_auction(auction_id):
 async def receive(self, text_data):
     auction = await get_auction(1)  # OK
 
-# ✅ 올바른 방법 2: sync_to_async 래퍼 (일회성)
+# 🔹 올바른 방법 2: sync_to_async 래퍼 (일회성)
 from asgiref.sync import sync_to_async
 
 async def receive(self, text_data):
@@ -272,7 +271,7 @@ async def receive(self, text_data):
 [단일 프로세스 환경]
 Consumer A ─────────────────────── Consumer B
               (같은 메모리 공유)
-              직접 통신 가능 ✅
+              직접 통신 가능 🔹
 
 [멀티 프로세스/서버 환경]
 Server 1                           Server 2
@@ -281,7 +280,7 @@ Server 1                           Server 2
     │                                  │
     └────────── Redis ─────────────────┘
               (중앙 메시지 브로커)
-              Pub/Sub으로 통신 ✅
+              Pub/Sub으로 통신 🔹
 ```
 
 ### 4.2 Group 동작 방식
@@ -331,7 +330,7 @@ services:
 하지만 WebSocket 알림을 보내려면 **비동기** Channel Layer를 호출해야 합니다.
 
 ```python
-# ❌ 문제: 동기 함수에서 await 사용 불가
+# 🔺 문제: 동기 함수에서 await 사용 불가
 def buy_now(auction_id, buyer):
     # ... 구매 로직 ...
     
@@ -356,7 +355,7 @@ def buy_now(auction_id, buyer):
                 'type': 'auction_end_notification',
                 'bidder': buyer.username,
                 'amount': instant_price_val,
-                'msg': f"📢 {buyer.username}님이 즉시 구매했습니다!"
+                'msg': f" {buyer.username}님이 즉시 구매했습니다!"
             }
         )
 
@@ -469,5 +468,3 @@ Django Channels와 Redis를 활용한 실시간 경매 시스템은 **동기와 
 
 > **작성자:** A1_NeighborBid_Auction 백엔드 개발팀  
 > **관련 문서:** [02_CORE_LOGIC_ANALYSIS.md](02_CORE_LOGIC_ANALYSIS.md) | [07_INFRASTRUCTURE_AND_DEPLOYMENT.md](07_INFRASTRUCTURE_AND_DEPLOYMENT.md)
-
-````

@@ -1,4 +1,3 @@
-````markdown
 # [Overview] NeighborBid: 동네 기반 실시간 경매 플랫폼
 
 > 이 문서는 A1_NeighborBid_Auction 프로젝트의 전체적인 개요와 핵심 기능, 기술 스택을 소개합니다.
@@ -85,7 +84,7 @@ NeighborBid는 지역 기반의 중고 거래와 실시간 경매를 결합한 �
 | 기술 | 역할 |
 |---|---|
 | Docker | 컨테이너 가상화 |
-| Docker Compose | 멀티 컨테이너 오케스트레이션 |
+| Docker Compose | 멀티 컨테이너 구성 및 실행 |
 | Redis Commander | Redis 모니터링 도구 |
 
 ### 3.3 프론트엔드
@@ -142,11 +141,11 @@ graph TD
         Common[common<br>지역/카테고리/알림]
     end
     
-    Users -->|1:1| Wallet
-    Auctions -->|N:1| Users
-    Auctions -->|N:1| Common
-    Auctions -->|1:N| Wallet
-    Users -->|N:1| Common
+    Users ---|1:1| Wallet
+    Auctions ---|N:1| Users
+    Auctions ---|N:1| Common
+    Auctions ---|1:N| Wallet
+    Users ---|N:1| Common
 ```
 
 ---
@@ -157,7 +156,7 @@ graph TD
 
 ```bash
 # 1. 프로젝트 클론
-git clone [repository-url]
+git clone repository-url
 cd A1_NeighborBid_Auction
 
 # 2. 컨테이너 실행
@@ -169,7 +168,7 @@ docker-compose exec web python manage.py createsuperuser
 
 # 4. 접속
 # 메인 서비스: http://localhost:8000
-# Redis 모니터링: http://localhost:8081
+# (관리자용)Redis 모니터링: http://localhost:8081
 ```
 
 ### 6.2 로컬 환경 사용
@@ -190,7 +189,7 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-> ⚠️ 로컬 환경에서 WebSocket 기능을 사용하려면 Redis 서버가 별도로 필요합니다.
+>  로컬 환경에서 WebSocket 기능을 사용하려면 Redis 서버가 별도로 필요합니다.
 
 ---
 
@@ -210,5 +209,3 @@ python manage.py runserver
 
 > **작성자:** A1_NeighborBid_Auction 개발팀  
 > **최종 수정:** 2026년 1월
-
-````

@@ -1,7 +1,6 @@
-
 # [Architecture] 유지보수성을 높이는 소프트웨어 패턴의 적용
 
-> 좋은 코드는 기능 구현을 넘어, 유지보수가 쉽고 확장에 열려 있어야 합니다. 이 문서는 A1_NeighborBid_Auction 프로젝트에 적용된 주요 **디자인 패턴(Design Pattern)**과 **아키텍처 패턴**을 소개하고, 각 패턴을 도입하게 된 **구체적인 상황과 근거**를 설명합니다.
+> 좋은 코드는 기능 구현을 넘어, 유지보수가 쉽고 확장에 열려 있어야 합니다. 이 문서는 A1_NeighborBid_Auction 프로젝트에 적용된 주요 **디자인 패턴(Design Pattern)과** **아키텍처 패턴을** 소개하고, 각 패턴을 도입하게 된 **구체적인 상황과 근거를** 설명합니다.
 
 ---
 
@@ -12,7 +11,7 @@
 초기 개발 단계에서는 Django의 관행대로 `views.py`에 비즈니스 로직을 작성했습니다.
 
 ```python
-# 초기 코드 (❌ Fat View)
+# 초기 코드 (🔺 Fat View)
 # auctions/views.py
 @login_required
 def auction_detail(request, auction_id):
@@ -21,7 +20,7 @@ def auction_detail(request, auction_id):
     if request.method == 'POST':
         amount = int(request.POST.get('amount'))
         
-        # 💥 비즈니스 로직이 View에 직접 들어감
+        # 비즈니스 로직이 View에 직접 들어감
         with transaction.atomic():
             auction = Auction.objects.select_for_update().get(id=auction_id)
             if auction.status != 'ACTIVE':
@@ -57,7 +56,7 @@ def auction_detail(request, auction_id):
 비즈니스 로직을 `services.py`로 분리하여 View의 역할을 명확히 했습니다.
 
 ```python
-# 개선된 구조 (✅ Thin View)
+# 개선된 구조 (🔹 Thin View)
 
 # auctions/services.py - 비즈니스 로직 전담
 def place_bid(auction_id, user, amount):
@@ -106,7 +105,7 @@ def save_bid(self, auction_id, user, amount):
 
 ### 2.1 도입 배경: 실시간 알림 요구사항
 
-경매 시스템에서는 **"누군가 입찰하면 다른 참여자도 알아야 한다"**는 요구사항이 있습니다.
+경매 시스템에서는 **"누군가 입찰하면 다른 참여자도 알아야 한다"** 는 요구사항이 있습니다.
 
 **관계 구조:**
 - **Subject (주체):** `Auction` (경매 물품) - 상태가 변하는 객체
@@ -119,7 +118,7 @@ Django Channels의 `Group`은 옵저버 패턴을 인프라 레벨에서 지원�
 ```python
 # 옵저버 패턴 흐름
 
-# 1️⃣ 구독 등록 (Subscribe)
+# 1️. 구독 등록 (Subscribe)
 async def connect(self):
     # 사용자가 경매 페이지에 접속하면 그룹에 등록
     await self.channel_layer.group_add(
@@ -127,7 +126,7 @@ async def connect(self):
         self.channel_name         # 이 소켓의 고유 채널
     )
 
-# 2️⃣ 상태 변경 시 통지 (Notify)
+# 2. 상태 변경 시 통지 (Notify)
 async def receive(self, text_data):
     if "입찰 성공":
         # Subject가 모든 Observer에게 알림
@@ -136,7 +135,7 @@ async def receive(self, text_data):
             {'type': 'auction_update', 'amount': new_price}
         )
 
-# 3️⃣ 알림 수신 (Update)
+# 3. 알림 수신 (Update)
 async def auction_update(self, event):
     # 각 Observer가 개별적으로 UI 업데이트
     await self.send(text_data=json.dumps({
@@ -144,7 +143,7 @@ async def auction_update(self, event):
         'amount': event['amount']
     }))
 
-# 4️⃣ 구독 해제 (Unsubscribe)
+# 4. 구독 해제 (Unsubscribe)
 async def disconnect(self, close_code):
     await self.channel_layer.group_discard(
         f'auction_{auction_id}',
@@ -170,9 +169,9 @@ async def disconnect(self, close_code):
 
 ```
 시나리오: 잔액 10,000원
-├─ 경매 A에 10,000원 입찰 ✅
-├─ 경매 B에 10,000원 입찰 ✅ (아직 잔액이 있는 것처럼 보임!)
-└─ 결과: 잔액 -10,000원 💥
+├─ 경매 A에 10,000원 입찰 🔹
+├─ 경매 B에 10,000원 입찰 🔹 (아직 잔액이 있는 것처럼 보임!)
+└─ 결과: 잔액 -10,000원🔺
 ```
 
 ### 3.2 적용: balance + locked_balance 이중 장부
@@ -334,7 +333,7 @@ class Auction(models.Model):
 
 ## 6. 결론: 패턴 적용의 원칙
 
-저희 팀은 **"패턴을 위한 패턴"**은 지양했습니다.
+저희 팀은 **"패턴을 위한 패턴"** 은 지양했습니다.
 
 | 문제 | 해결책 (패턴) |
 |---|---|
