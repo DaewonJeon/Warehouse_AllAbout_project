@@ -101,7 +101,7 @@ def place_bid(...):
 **한계:** 
 - 재시도(Retry) 로직 구현 복잡
 - 마감 직전에는 재시도 중 경매 종료될 수 있음
-- 충돌이 빈번한 경매에서는 성능 저하
+- **충돌이 빈번한 경매** 에서는 성능 저하!! 🔺
 
 #### 시도 3: 비관적 락 (Pessimistic Lock) 🔹최종 채택
 
@@ -179,7 +179,7 @@ def buy_now(auction_id, buyer):
     with transaction.atomic():
         auction = Auction.objects.select_for_update().get(id=auction_id)
         
-        # ... 구매 처리 로직 ...
+        # 구매 처리 로직
         
         auction.status = 'ENDED'
         auction.save()

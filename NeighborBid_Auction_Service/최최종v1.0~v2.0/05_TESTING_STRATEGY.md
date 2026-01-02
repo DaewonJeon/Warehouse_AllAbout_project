@@ -186,6 +186,8 @@ python manage.py test auctions.tests.PlaceBidTestCase
 python manage.py test auctions.tests.PlaceBidTestCase.test_tc001_normal_bid_success
 ```
 
+- **실행 결과: 5개 테스트 모두 성공**
+
 ---
 
 ## 3. 동시성 테스트 (Concurrency Test)
