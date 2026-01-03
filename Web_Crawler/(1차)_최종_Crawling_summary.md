@@ -321,7 +321,7 @@ for future in asyncio.as_completed(tasks):
 [User/Admin]
      │
      ▼
-[Django] ──Task 발행──→ [Redis] ──Task 소비──→ [Celery Worker]
+[Django] ─Task 발행─→ [Redis] ─Task 소비─→ [Celery Worker]
 (Producer)            (Broker)               (Consumer)
                                                   │
                                                   ▼
@@ -336,64 +336,25 @@ for future in asyncio.as_completed(tasks):
 
 **3. Celery Task 정의 (crawler/tasks.py)**
 ```python
-from celery import shared_task
-from playwright.async_api import async_playwright
-import asyncio
-from asgiref.sync import sync_to_async
 
 @shared_task
 def start_book_crawler():
-    """Django에서 호출하는 진입점"""
+    #Django에서 호출 진입
     asyncio.run(crawl_books_logic())
-    return "책 수집 작업 완료"
+    return "수집 완료"
 
 async def crawl_books_logic():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        # ... 크롤링 로직
+        # 크롤링 로직
         
         # Django ORM 비동기 호출
         await sync_to_async(Book.objects.update_or_create)(
-            url=clean_url,
-            defaults={'title': title, 'price': price, ...}
+            ...
         )
 ```
 
-**4. Django Model 정의 (crawler/models.py)**
-```python
-class Book(models.Model):
-    title = models.CharField(max_length=500)
-    price = models.CharField(max_length=50)
-    rating = models.CharField(max_length=50)
-    stock = models.CharField(max_length=50)
-    url = models.URLField(unique=True)
-    crawled_at = models.DateTimeField(auto_now=True)
-```
-
-#### ⚠️ Windows 환경 이슈 해결
-```
-📌 문제: Celery 4.x + Windows에서 prefork 풀 충돌
-📌 증상: 프로세스 멈춤, multiprocessing 에러
-📌 해결: solo 풀 모드 사용
-```
-
-```bash
-# Windows 환경 실행 명령
-celery -A config worker -l info -P solo
-```
-
-#### 🐳 Docker 인프라
-```yaml
-# docker-compose.yml (Redis)
-version: '3'
-services:
-  redis:
-    image: redis
-    ports:
-      - "6379:6379"
-```
-
-#### 📊 성능 지표
+#### 성능 지표 
 - **확장성**: 워커 수평 확장 가능 (여러 서버에 분산)
 - **안정성**: 웹 서버 부하와 크롤링 작업 분리
 - **모니터링**: Django Admin을 통한 실시간 데이터 확인
@@ -401,52 +362,32 @@ services:
 ---
 
 ### v2.0 - 무신사 크롤러 + OpenSearch 파이프라인
-
-#### 📁 관련 파일
+```
 - `v2.0_musinsa.py`
 - `init_opensearch.py`
 - `docker-compose.yml`
-- `프로젝트기록/v2.0_musinsa_project.md`
 
-#### 🎯 목표
 - 쿠팡 차단으로 인한 타겟 변경 (무신사)
 - RDBMS 한계 극복을 위한 검색 엔진(OpenSearch) 도입
 - 한국어 형태소 분석기 적용
 
-#### 🏗️ 아키텍처
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    [무신사 웹사이트]                          │
-│                           │                                  │
-│                 (1. 비동기 수집: Playwright)                  │
-│                           │                                  │
-│                           ▼                                  │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │            데이터 전처리 (ETL Worker)                     │ │
-│ │  - HTML 파싱 (Meta Tag & XPath 활용)                     │ │
-│ │  - 데이터 정제 (가격 숫자 변환, 불용어 처리)                 │ │
-│ │  - 구조화 (JSON Serialize)                               │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                           │                                  │
-│                 (2. Bulk Insert)                             │
-│                           │                                  │
-│                           ▼                                  │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │     OpenSearch (Docker Container) + Nori Analyzer        │ │
-│ │  - 역색인(Inverted Index) 기반 전문 검색                  │ │
-│ │  - 한국어 복합명사 분리 (여성패딩 → 여성, 패딩)             │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                           │                                  │
-│                 (3. 시각화 및 모니터링)                       │
-│                           │                                  │
-│                           ▼                                  │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │            OpenSearch Dashboards (Port: 5601)            │ │
-│ └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│           [무신사 웹사이트]          │
+│                  │                   │
+│         Playwright 비동기 수집       │
+│                  ▼                   │
+│     [ETL] 파싱/정제 → JSON 변환      │
+│                  │                   │
+│            Bulk Insert               │
+│                  ▼                   │
+│   [OpenSearch + Nori] 전문 검색      │
+│                  │                   │
+│                  ▼                   │
+│       [Dashboards] 시각화            │
+└──────────────────────────────────────┘
 ```
 
-#### 💡 MySQL vs OpenSearch 비교
+#### MySQL vs OpenSearch 비교
 
 | 특징 | MySQL (RDBMS) | OpenSearch (NoSQL/검색엔진) |
 |------|---------------|----------------------------|
@@ -456,37 +397,16 @@ services:
 | **속도** | 복잡한 검색 시 느려짐 | 대용량에서도 매우 빠름 |
 | **트랜잭션** | 지원 (ACID) | 미지원 (Eventual Consistency) |
 
-#### 💡 핵심 구현 사항
+#### 🔹핵심 구현 사항
 
 **1. OpenSearch 인덱스 설정 (init_opensearch.py)**
 ```python
-index_body = {
-    "settings": {
-        "index": {
-            "analysis": {
-                "tokenizer": {
-                    "nori_user_dict": {
-                        "type": "nori_tokenizer",
-                        "decompound_mode": "mixed"  # 합성어 분리
-                    }
-                },
-                "analyzer": {
-                    "korean_analyzer": {
-                        "type": "custom",
-                        "tokenizer": "nori_user_dict"
-                    }
-                }
-            }
-        }
-    },
-    "mappings": {
-        "properties": {
-            "title": {"type": "text", "analyzer": "korean_analyzer"},
-            "brand": {"type": "keyword"},  # 정확 일치용
-            "price": {"type": "integer"}   # 범위 검색용
-        }
-    }
-}
+index_body = ...
+        "nori_user_dict": {
+               "type": "nori_tokenizer",
+               "decompound_mode": "mixed"  # 합성어 분리
+        } ...
+    "mappings": {...}
 ```
 
 **2. 동적 클래스명 대응 전략**
@@ -546,7 +466,7 @@ for url in url_list:
 success, failed = helpers.bulk(client, docs)
 ```
 
-#### 🐳 Docker 인프라 (OpenSearch + Dashboards)
+####  Docker (OpenSearch / Dashboards)
 ```yaml
 version: '3'
 services:
@@ -566,52 +486,36 @@ services:
       OPENSEARCH_HOSTS: '["http://opensearch-node:9200"]'
 ```
 
-#### ⚠️ 발견된 문제 및 해결
-
-**Dashboards 데이터 미표시 이슈**
-```
-📌 문제: 데이터 적재 로그는 Success인데 Discover에서 안 보임
-📌 원인: 기본 필터가 "Last 15 minutes"로 설정됨
-📌 해결: 
-  1. Index Pattern 생성 시 created_at 필드를 Time Filter로 지정
-  2. 조회 범위를 Last 24 Hours로 확장
-```
-
 ---
 
 ### v2.1 - 검색 엔진 API 서비스 구축
-
-#### 📁 관련 파일
+```
 - `v2.1_musinsa.py`
 - `api_server.py`
 - `index.html`
-- `프로젝트기록/v2.1_musinsa.md`
 
-#### 🎯 목표
 End-to-End 검색 서비스 구축 (크롤링 → 저장 → API → 웹 UI)
 
-#### 🏗️ 아키텍처
-```
 ┌─────────────────────────────────────────────────────────────┐
-│     [무신사 웹사이트]                                         │
-│            │                                                 │
-│            │ (1. 비동기 수집: Playwright)                     │
-│            ▼                                                 │
-│     [데이터 전처리 Worker]                                    │
-│            │                                                 │
-│            │ (2. Bulk Insert)                                │
-│            ▼                                                 │
-│     [OpenSearch + Nori]                                      │
-│            │                                                 │
-│            │ (3. Search Query)                               │
-│            ▼                                                 │
-│     [FastAPI Server] ─────────────────────────               │
-│            │                      │                          │
-│            │ REST API             │ Swagger UI               │
-│            │                      │                          │
-│            ▼                      ▼                          │
-│     [Web Frontend]        [API Docs]                         │
-│     (index.html)          (/docs)                            │
+│     [무신사 웹사이트]                                       │
+│            │                                                │
+│            │ (1. 비동기 수집: Playwright)                   │
+│            ▼                                                │
+│     [데이터 전처리 Worker]                                  │
+│            │                                                │
+│            │ (2. Bulk Insert)                               │
+│            ▼                                                │
+│     [OpenSearch + Nori]                                     │
+│            │                                                │
+│            │ (3. Search Query)                              │
+│            ▼                                                │
+│     [FastAPI Server] ─────────────────────────              │
+│            │                      │                         │
+│            │ REST API             │ Swagger UI              │
+│            │                      │                         │
+│            ▼                      ▼                         │
+│     [Web Frontend]        [API Docs]                        │
+│     (index.html)          (/docs)                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -622,13 +526,7 @@ End-to-End 검색 서비스 구축 (크롤링 → 저장 → API → 웹 UI)
 from fastapi import FastAPI, Query
 from opensearchpy import OpenSearch
 from pydantic import BaseModel
-
-app = FastAPI(
-    title="Musinsa Search Engine",
-    description="무신사 크롤링 데이터를 검색하는 API입니다.",
-    version="1.0.0"
-)
-
+app = FastAPI(...)
 # CORS 설정 (프론트엔드 연동)
 app.add_middleware(
     CORSMiddleware,
@@ -641,16 +539,9 @@ app.add_middleware(
 **2. Pydantic 스키마 정의**
 ```python
 class SellerInfo(BaseModel):
-    company: str
-    brand: str
-    contact: Optional[str] = None
-
+    ...
 class ProductSchema(BaseModel):
-    title: str
-    brand: str
-    price: int
-    url: str
-    seller_info: Optional[SellerInfo] = None
+    ...
 ```
 
 **3. 검색 API 엔드포인트**
@@ -689,37 +580,7 @@ def search_products(
 
 **4. 웹 프론트엔드 (index.html)**
 ```javascript
-async function doSearch() {
-    const keyword = document.getElementById('keyword').value;
-    
-    // FastAPI 서버 호출
-    const response = await fetch(`http://127.0.0.1:8000/search?keyword=${keyword}`);
-    const data = await response.json();
-    
-    // 결과 렌더링
-    data.forEach(item => {
-        const html = `
-            <a href="${item.url}" target="_blank">
-                <div class="card">
-                    <div class="card-brand">${item.brand}</div>
-                    <h3 class="card-title">${item.title}</h3>
-                    <div class="card-price">${item.price.toLocaleString()}원</div>
-                </div>
-            </a>
-        `;
-        resultDiv.innerHTML += html;
-    });
-}
-```
-
-#### ⚠️ 데이터 정합성 이슈 해결
-
-```
-📌 문제: API 500 에러 발생
-📌 원인: 크롤러에서 brand, price 필드 누락 → Pydantic 검증 실패
-📌 해결:
-  1. OpenSearch Mapping과 Pydantic Schema 일치시킴
-  2. 크롤러에서 필드 누락 시 기본값 할당
+async function doSearch() {...}
 ```
 
 ---
@@ -730,10 +591,10 @@ async function doSearch() {
 
 | 시도 | 방법 | 결과 |
 |------|------|------|
-| 1차 | User-Agent 변경 | ❌ 실패 |
-| 2차 | Referer 헤더 조작 | ❌ 실패 |
-| 3차 | playwright-stealth 라이브러리 | ❌ 실패 |
-| 4차 | **Chrome CDP (기생 모드)** | ✅ 성공 |
+| 1차 | User-Agent 변경 | 실패 |
+| 2차 | Referer 헤더 조작 | 실패 |
+| 3차 | playwright-stealth 라이브러리 | 실패 |
+| 4차 | **Chrome CDP (기생 모드)** |🔹성공 |
 
 **최종 해결책**: 사용자가 직접 실행한 크롬 브라우저에 Playwright가 연결
 ```bash
@@ -754,31 +615,28 @@ chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\chrome_debug_temp"
 # v1.0: asyncio.Lock() - 여전히 PermissionError 가능
 async with file_lock:
     with open(FILE_NAME, ...) as f:
-
 # v1.1: SQLite DB 전환 + Batch Insert
 def save_batch_to_db(batch_data):
-    cursor.executemany('''
-        INSERT OR REPLACE INTO sellers (...)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', batch_data)
+    cursor.executemany(... , batch_data)
 ```
 
 ### 4.4 쿠팡 최종 차단 사건 (v1.1)
 
 ```
-📅 시점: v1.1 VPN 적용 후 50건 수집 중
-📌 증상: Access Denied
-📌 시도: 쿠키 삭제, 시크릿 모드 → 여전히 차단
-📌 결론: IP 차단 + VPN 서버 대역 전체 차단
-📌 결정: 타겟 변경 (쿠팡 → 무신사)
+ 시점: v1.1 VPN 적용 후 50건 수집 중
+ 증상: Access Denied
+ 시도: 쿠키 삭제, 시크릿 모드 → 여전히 차단
+ 결론: IP 차단 + VPN 서버 대역 전체 차단
+ 결정: 타겟 변경 (쿠팡 → 무신사)
 ```
 
-**쿠팡 보안 매커니즘 분석**
+**쿠팡 보안 분석**
 ```
 1. 식별용 쿠키 발급
 2. 이상 행동 감지 → 신뢰점수 하락
 3. 세션/쿠키 차단 (IP는 유지 - 다수 사용자 고려)
 4. 반복 시 IP 차단 → VPN 감지 시 대역 차단
+5. 일반 ip보다 vpn에 더 엄격히 대응하는듯함.
 ```
 
 ### 4.5 동적 클래스명 대응 (v2.0)
@@ -803,51 +661,39 @@ title_loc = page.locator("meta[property='og:title']").first
 ```
 
 ---
-
 ## 5. 아키텍처 진화 과정
-
-### 5.1 데이터 저장소 진화
 ```
+5.1 데이터 저장소 진화
 CSV 파일 (v0.9, v1.0)
-     │
      │ 파일 충돌 문제
      ▼
 SQLite DB + Batch (v1.1)
-     │
      │ 검색 기능 한계
      ▼
 Django ORM (v1.2)
-     │
      │ 전문 검색 요구
      ▼
 OpenSearch (v2.0, v2.1)
-```
 
-### 5.2 처리 방식 진화
-```
+==========================
+5.2 처리 방식 진화
 Sync (v0.9)
-  │
-  │ 10배 성능 개선 필요
+  │ 성능 개선 필요
   ▼
 Async + Semaphore (v1.0)
-  │
   │ 실시간 처리 필요
   ▼
 Async + as_completed + Batch (v1.1)
-  │
   │ 웹 서버 분리 필요
   ▼
 Celery + Redis (v1.2)
-```
 
-### 5.3 서비스 형태 진화
-```
+==========================
+5.3 서비스 형태 진화
 스크립트 (v0.9 ~ v1.1)
-     │
      │ 관리 기능 필요
      ▼
 Django Admin (v1.2)
-     │
      │ API 서비스 필요
      ▼
 FastAPI + Web UI (v2.1)
@@ -868,9 +714,7 @@ FastAPI + Web UI (v2.1)
 
 ### 6.2 아키텍처 설계 교훈
 
-```
-"단순 기능 구현"을 넘어 "시스템 설계"의 중요성
-```
+> "시스템 설계"의 중요성
 
 - 초기: 단순 스크립트로 시작
 - 중기: 차단, 성능, 안정성 문제 직면
@@ -895,55 +739,6 @@ FastAPI + Web UI (v2.1)
 
 ---
 
-## 📎 부록: 실행 가이드
 
-### A. 크롬 디버깅 모드 실행
-```bash
-# Windows
-chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\chrome_debug_temp"
-```
-
-### B. OpenSearch 환경 구성
-```bash
-# 컨테이너 실행
-docker-compose up -d
-
-# Nori 분석기 설치 (최초 1회)
-docker exec -it opensearch-node ./bin/opensearch-plugin install analysis-nori
-docker-compose restart
-
-# 인덱스 초기화
-python init_opensearch.py
-```
-
-### C. 데이터 수집 및 API 실행
-```bash
-# 데이터 수집 (v2.1)
-python v2.1_musinsa.py
-
-# API 서버 실행
-python api_server.py
-
-# 웹 UI 접속
-# index.html 파일을 브라우저로 열기
-```
-
-### D. Celery 환경 실행 (v1.2)
-```bash
-# Terminal 1: Django
-python manage.py runserver
-
-# Terminal 2: Celery Worker (Windows)
-celery -A config worker -l info -P solo
-
-# Terminal 3: Task 실행
-python manage.py shell
->>> from crawler.tasks import start_book_crawler
->>> start_book_crawler.delay()
-```
-
----
-
-> **문서 작성**: Senior Developer Level  
-> **마지막 업데이트**: 2026-01-03  
-> **프로젝트 기간**: 2025-11 ~ 2026-01 (약 2개월)
+> **문서 작성**: DH / Z
+> **프로젝트 기간**: 2025-11 ~ 2026-01 
