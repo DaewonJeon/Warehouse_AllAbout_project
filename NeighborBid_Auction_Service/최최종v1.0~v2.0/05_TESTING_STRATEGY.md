@@ -12,17 +12,17 @@
 저희 팀은 빠른 피드백을 위해 **단위 테스트** 의 비중을 높이고, 핵심 시나리오에 대해 **통합 테스트** 를 수행하는 전략을 취했습니다.
 
 ```
-                    ┌─────────────┐
-                    │  E2E Test   │  10%
-                    │  (수동/UI)   │
-                    ├─────────────┤
-                    │ Integration │  20%
-                    │    Test     │
-                    ├─────────────┤
-                    │             │
-                    │  Unit Test  │  70%
-                    │             │
-                    └─────────────┘
+            ┌─────────────┐
+            │  E2E Test   │  10%
+            │  (수동/UI)   │
+            ├─────────────┤
+            │ Integration │  20%
+            │    Test     │
+            ├─────────────┤
+            │             │
+            │  Unit Test  │  70%
+            │             │
+            └─────────────┘
 ```
 
 | 테스트 유형 | 비중 | 목적 | 실행 속도 |
@@ -476,7 +476,18 @@ class AuctionViewIntegrationTest(TestCase):
         wallet = Wallet.objects.get(user=self.bidder)
         self.assertEqual(wallet.balance, Decimal('100000'))  # 기존 50000 + 충전 50000
 ```
-
+| 테스트 클래스 | 테스트 케이스 | 결과 |
+| :--- | :--- | :---: |
+| **AuctionViewIntegrationTest**<br>(View-Service-DB 통합 테스트) | TC-INT-001: HTTP 요청 입찰 | 🔹 |
+| | TC-INT-002: 지갑 충전 | 🔹 |
+| | TC-INT-003: 판매자 입찰 차단 | 🔹 |
+| | TC-INT-004: 잔액 부족 입찰 차단 | 🔹 |
+| **PlaceBidTestCase**<br>(단위 테스트) | TC-001: 정상 입찰 성공 | 🔹 |
+| | TC-002: 잔액 부족 | 🔹 |
+| | TC-003: 종료된 경매 입찰 차단 | 🔹 |
+| | TC-004: 최소 금액 미달 | 🔹 |
+| | TC-005: 이전 입찰자 환불 |🔹 |
+| **ConcurrencyTestCase**<br>(동시성 테스트) | 이중 지출 방지 | 🔹 |
 ---
 
 ## 5. 수동 검증 프로세스 (Manual QA)
@@ -539,5 +550,5 @@ class AuctionViewIntegrationTest(TestCase):
 > 3. 🔹 Happy Path뿐 아니라 Exception Path도 테스트
 > 4. 🔹 실제 사용자 시나리오로 수동 검증
 
-> **작성자:** A1_NeighborBid_Auction 개발팀
+> **작성자:** DH / Z
 > **관련 문서:** [04_TRIALS_AND_ERRORS.md](04_TRIALS_AND_ERRORS.md) | [데이터베이스(설계과정).md](데이터베이스(설계과정).md)
