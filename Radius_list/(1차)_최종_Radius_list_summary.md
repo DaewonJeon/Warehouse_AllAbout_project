@@ -148,16 +148,23 @@ NearbyStore.objects.update_or_create(
 ## 5. 아키텍처 요약
 
 ```
-    A[사용자 요청 / Batch] --> B(Django Management Command);
-    B --> C{데이터 수집 전략};
-    C -- 1. 지역 분할 --> D[Kakao API (District Search)];
-    C -- 2. 4분면 분할 --> E[Kakao API (Quadrant Radius)];
-    D --> F[Raw Data];
-    E --> F;
-    F --> G[중복 제거 및 정제 (Upsert)];
-    G --> H[(PostgreSQL + PostGIS)];
-    H --> I[Django View / API];
-    I --> J[Web Map Visualization];
+            [사용자 요청/Batch]
+                    │
+                    ▼
+        [Django Management Command]
+                    │
+        ├──────────────────────┐
+        ▼                      ▼
+[1. 지역 분할]          [2. 4분면 분할]
+ (District)              (Quadrant)
+        │     Kakao API        │
+        └──────────┬───────────┘
+                   ▼
+         [Raw Data] → [중복 제거/Upsert]
+                   │
+         [PostgreSQL + PostGIS]
+                   │
+         [Django View/API] → [Web Map 시각화]
 ```
 
 1. **Collector**: 지역별/분면별로 API를 잘게 쪼개서 호출 (Coverage 극대화).
